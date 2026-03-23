@@ -1,0 +1,22 @@
+#!/bin/bash
+# Pre-push hook - BLOCKS all pushes from automated tools
+# AI assistants cannot push - they must show commits and let user push manually
+#
+# To push manually: git push --no-verify
+# Or delete this hook: rm .git/hooks/pre-push
+
+echo ""
+echo "=========================================="
+echo "  PUSH BLOCKED"
+echo "=========================================="
+echo ""
+echo "Automated pushes are disabled."
+echo ""
+echo "To push, the USER must run one of:"
+echo "  git push --no-verify"
+echo "  rm .git/hooks/pre-push && git push"
+echo ""
+echo "Files that would be pushed:"
+git diff --stat origin/$(git branch --show-current)...HEAD 2>/dev/null || git diff --stat HEAD~1..HEAD
+echo ""
+exit 1

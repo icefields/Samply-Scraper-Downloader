@@ -27,6 +27,7 @@ load_dotenv(env_path / ".env.samply")
 # Config from environment
 STATE_FILE = Path(os.path.expanduser(os.getenv("SAMPLY_STATE_FILE", str(Path(__file__).parent / "samply_tracker_state.json"))))
 DOWNLOADS_DIR = Path(os.path.expanduser(os.getenv("SAMPLY_DOWNLOADS_DIR", str(Path(__file__).parent / "samply_downloads"))))
+COPY_DIR = Path(os.path.expanduser(os.getenv("SAMPLY_COPY_DIR", ""))) if os.getenv("SAMPLY_COPY_DIR") else None
 PREFER_FLAC = os.getenv("SAMPLY_PREFER_FLAC", "true").lower() == "true"
 OUTPUT_FORMAT = os.getenv("SAMPLY_OUTPUT_FORMAT", "opus")
 OUTPUT_BITRATE = os.getenv("SAMPLY_OUTPUT_BITRATE", "192k")
@@ -50,6 +51,19 @@ def get_cdn_url(state, file_id, quality="aac256k"):
     quality: 'aac256k', 'flac', or 'wav'
     """
     return f"{state['cdn_base']}/{file_id}/output/{quality}@output.mp4"
+
+
+def copy_to_destination(output_path):
+    """Copy the output file to the destination directory if configured."""
+    import shutil
+    
+    if not COPY_DIR:
+        return
+    
+    COPY_DIR.mkdir(parents=True, exist_ok=True)
+    dest_path = COPY_DIR / output_path.name
+    shutil.copy2(output_path, dest_path)
+    print(f"  ✓ Copied to {COPY_DIR}")
 
 
 def download_track(state, track, prefer_flac=None):
@@ -134,6 +148,9 @@ def download_track(state, track, prefer_flac=None):
     # Cleanup temp file
     source_path.unlink(missing_ok=True)
     print(f"  ✓ Converted to {output_path.name}")
+    
+    # Copy to destination if configured
+    copy_to_destination(output_path)
     
     return True
 

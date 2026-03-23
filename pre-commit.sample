@@ -2,12 +2,22 @@
 # Pre-commit hook to block sensitive files
 # Install: cp pre-commit.sample .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
-# Check for .env files
-if git diff --cached --name-only | grep -qE '\.env$|\.env\.'; then
+# Check for .env files (but allow .env.samply-example, .env-example, etc.)
+if git diff --cached --name-only | grep -qE '^[^/]*\.env$|/\.env$'; then
     echo ""
     echo "❌ BLOCKED: .env file detected in commit"
     echo "   .env files may contain personal info and should not be committed"
-    echo "   Use .env-example with placeholders instead"
+    echo "   Use .env-example or .env.samply-example with placeholders instead"
+    echo ""
+    exit 1
+fi
+
+# Allow .env.samply-example, .env-example, etc. (example files)
+# Block actual config files like .env.samply, .env.local
+if git diff --cached --name-only | grep -qE '\.env\.(samply|local|production|staging|dev)$'; then
+    echo ""
+    echo "❌ BLOCKED: Active .env.* config file detected"
+    echo "   Only example files (.env-example, .env.samply-example) should be committed"
     echo ""
     exit 1
 fi

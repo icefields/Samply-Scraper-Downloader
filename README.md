@@ -49,22 +49,28 @@ sudo pacman -S chromium
 sudo apt install chromium
 ```
 
-### Clone and Setup
+### Setup
 
 ```bash
 # Clone the repository
 git clone https://github.com/icefields/Samply-Scraper-Downloader.git
 cd Samply-Scraper-Downloader
 
-# Create your configuration
-cp .env-example .env
+# Create your configuration from the example
+cp .env.samply-example .env.samply
 
-# Edit .env with your project details
-$EDITOR .env
-
-# Create downloads directory (if not exists)
-mkdir -p ~/Music/samply_downloads
+# Edit .env.samply with your project details
+$EDITOR .env.samply
 ```
+
+### Configuration Files
+
+| File | Purpose | Tracked in Git? |
+|------|---------|------------------|
+| `.env.samply-example` | Template with example values | Yes |
+| `.env.samply` | Your personal configuration | **No** (gitignored) |
+
+The scripts load `.env.samply` for configuration. Copy the example file, edit it with your URL and preferences, and you're ready to run.
 
 ---
 
@@ -253,8 +259,7 @@ ffmpeg -i track.mp4 -c:a libopus -b:a 192k track.opus
 
 Configuration is handled via environment variables, loaded from two files in order:
 
-1. `.env` — User overrides (gitignored, create from `.env-example`)
-2. `.env.samply` — Default values shipped with the project
+1. `.env.samply` — Your configuration (gitignored, create from `.env.samply-example`)
 
 ### Environment Variables
 
@@ -391,8 +396,8 @@ The `aac256k` quality is always available. FLAC availability depends on whether 
 ```
 SamplyScraperDownloader/
 ├── .env                    # User configuration (gitignored)
-├── .env-example            # Template with documentation
-├── .env.samply             # Default configuration
+├── .env.samply-example   # Template with documentation
+├── .env.samply             # Your configuration (gitignored)
 ├── .git/                   # Git repository
 ├── README.md               # This file
 ├── samply_browser.py       # Browser automation (Playwright)

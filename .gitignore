@@ -12,8 +12,13 @@ __pycache__/
 venv/
 .venv/
 
-# Downloads
+# Downloads - large binary files, should not be in repo
 samply_downloads/
+*.flac
+*.mp3
+*.opus
+*.m4a
+*.mp4
 
 # State file - contains personal URLs and IDs
 samply_tracker_state.json

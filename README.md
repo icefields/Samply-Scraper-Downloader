@@ -37,6 +37,8 @@ pip install python-dotenv playwright
 playwright install chromium
 ```
 
+**Note:** Playwright controls Chromium directly via DevTools Protocol — **no browser extensions needed**. It runs in headless mode (no visible window).
+
 Or use your system Chromium (auto-detected):
 
 ```bash
@@ -564,6 +566,8 @@ SAMPLY_OUTPUT_FORMAT=flac
 pip install playwright
 playwright install chromium
 ```
+
+**No browser extensions required** — Playwright controls Chromium directly via Chrome DevTools Protocol.
 
 ### "Timeout loading page after 60000ms"
 

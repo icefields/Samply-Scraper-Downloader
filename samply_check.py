@@ -3,8 +3,14 @@
 Samply Update Checker
 Checks for version updates via browser automation and downloads changed files.
 Uses .env.samply or .env for configuration.
+
+Usage:
+    python3 samply_check.py           # Download only updated tracks
+    python3 samply_check.py -f        # Force re-download all tracks
+    python3 samply_check.py --force   # Force re-download all tracks
 """
 
+import argparse
 import json
 import os
 import subprocess
@@ -189,49 +195,75 @@ def compare_versions(old_tracks, current_versions):
 
 
 def main():
+    # Parse arguments
+    parser = argparse.ArgumentParser(description="Check for Samply updates and download changed tracks")
+    parser.add_argument("-f", "--force", action="store_true", help="Force re-download all tracks regardless of version")
+    args = parser.parse_args()
+    
     # Ensure downloads dir exists
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
     
     state = load_state()
     
-    # Check via browser (would be implemented as sub-agent)
+    # Check via browser
     current_versions = check_via_browser(state)
     
     if current_versions is None:
-        print("Could not check versions - browser tab may not be attached")
+        print("Could not check versions - browser check failed")
         sys.exit(1)
     
-    changes = compare_versions(state["tracks"], current_versions)
-    
-    if changes:
-        print(f"Found {len(changes)} updated track(s):")
-        for change in changes:
-            print(f"  {change['track']['name']}: v{change['old_version']} → v{change['new_version']}")
-            
-            # Update version in state
-            for track in state["tracks"]:
-                if track["name"] == change["track"]["name"]:
-                    track["version"] = change["new_version"]
-                    download_track(state, track)
-                    track["downloaded"] = True
-                    print(f"  ✓ Downloaded {track['name']}")
+    if args.force:
+        # Force mode: download all tracks regardless of version
+        print(f"Force mode: re-downloading all {len(state['tracks'])} track(s)")
+        for track in state["tracks"]:
+            print(f"  {track['name']} (v{track['version']})")
+            download_track(state, track)
+            track["downloaded"] = True
+            print(f"  ✓ Downloaded {track['name']}")
         
         # Add to history
         if "history" not in state:
             state["history"] = []
-        for change in changes:
-            state["history"].append({
-                "date": datetime.now().strftime("%Y-%m-%d"),
-                "change": f"{change['track']['name']} updated v{change['old_version']}→v{change['new_version']}"
-            })
+        state["history"].append({
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "change": f"Force re-downloaded all tracks"
+        })
         
         save_state(state)
-        print("\nUpdates complete!")
+        print("\nForce download complete!")
     else:
-        print("No updates found")
-        state["last_check"] = datetime.now().isoformat()
-        state["last_check_status"] = f"v{state['tracks'][0]['version'] if state['tracks'] else '?'} (no change)"
-        save_state(state)
+        # Normal mode: only download updated tracks
+        changes = compare_versions(state["tracks"], current_versions)
+        
+        if changes:
+            print(f"Found {len(changes)} updated track(s):")
+            for change in changes:
+                print(f"  {change['track']['name']}: v{change['old_version']} → v{change['new_version']}")
+                
+                # Update version in state
+                for track in state["tracks"]:
+                    if track["name"] == change["track"]["name"]:
+                        track["version"] = change["new_version"]
+                        download_track(state, track)
+                        track["downloaded"] = True
+                        print(f"  ✓ Downloaded {track['name']}")
+            
+            # Add to history
+            if "history" not in state:
+                state["history"] = []
+            for change in changes:
+                state["history"].append({
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "change": f"{change['track']['name']} updated v{change['old_version']}→v{change['new_version']}"
+                })
+            
+            save_state(state)
+            print("\nUpdates complete!")
+        else:
+            print("No updates found")
+            state["last_check"] = datetime.now().isoformat()
+            state["last_check_status"] = f"v{state['tracks'][0]['version'] if state['tracks'] else '?'} (no change)"
+            save_state(state)
 
 
 if __name__ == "__main__":

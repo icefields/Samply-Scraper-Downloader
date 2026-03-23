@@ -151,6 +151,22 @@ python3 samply_check.py
 # Updates complete!
 ```
 
+**Force re-download all tracks:**
+
+```bash
+# Force re-download even if version hasn't changed
+python3 samply_check.py --force
+
+# Output:
+# Force mode: re-downloading all 1 track(s)
+#   Sweet Fiend EP.mp3 (v8)
+#   Downloaded FLAC source
+#   ✓ Converted to Sweet Fiend EP.opus
+#   ✓ Downloaded Sweet Fiend EP.mp3
+#
+# Force download complete!
+```
+
 **What it does:**
 1. Loads state from `samply_tracker_state.json`
 2. Calls `samply_browser.py` to extract current versions from the Samply page

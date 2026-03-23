@@ -29,7 +29,8 @@ A Python toolkit for tracking and downloading audio files from Samply project sh
 ### Install Python Dependencies
 
 ```bash
-pip install python-dotenv
+pip install python-dotenv playwright
+playwright install chromium
 ```
 
 ### Clone and Setup
@@ -65,6 +66,32 @@ mkdir -p ~/Music/samply_downloads
 | Package | Purpose | Version |
 |---------|---------|---------|
 | `python-dotenv` | Load environment variables from .env files | >=0.19.0 |
+| `playwright` | Browser automation for version checking | >=1.40.0 |
+
+### Installing Playwright
+
+After installing the Python package, you must install the browser:
+
+```bash
+pip install playwright
+playwright install chromium
+```
+
+Or use your system's Chromium (the script will auto-detect `/usr/bin/chromium`):
+
+```bash
+# Arch Linux
+sudo pacman -S chromium
+
+# Debian/Ubuntu
+sudo apt install chromium
+```
+# Arch Linux
+sudo pacman -S chromium
+
+# Debian/Ubuntu
+sudo apt install chromium
+```
 
 ---
 

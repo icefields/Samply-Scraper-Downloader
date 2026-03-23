@@ -1,6 +1,6 @@
 # Samply Track Downloader
 
-A Python toolkit for tracking and downloading audio files from Samply project shares. Monitors for version updates and automatically downloads changed tracks.
+While working with a producer to mix my band's latest album, I hated using Samply so much that I created this Python toolkit for tracking and downloading audio files from Samply project shares. It monitors for version updates and automatically downloads changed tracks. This script also converts the files in case they're sent using proprietary (or Apple) formats.
 
 ## Table of Contents
 

@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """
 Samply Track Tracker
-Checks for version updates via browser automation and downloads changed files.
+Displays project info and track status.
+Uses .env.samply or .env for configuration.
 """
 
 import json
-import subprocess
-import re
+import os
 from datetime import datetime
 from pathlib import Path
+from dotenv import load_dotenv
 
-STATE_FILE = Path(__file__).parent / "samply_tracker_state.json"
-DOWNLOADS_DIR = Path(__file__).parent / "samply_downloads"
+# Load environment from .env first (user config), fallback to .env.samply (defaults)
+env_path = Path(__file__).parent
+load_dotenv(env_path / ".env", override=True)
+load_dotenv(env_path / ".env.samply")
+
+# Config from environment
+STATE_FILE = Path(os.path.expanduser(os.getenv("SAMPLY_STATE_FILE", str(Path(__file__).parent / "samply_tracker_state.json"))))
+DOWNLOADS_DIR = Path(os.path.expanduser(os.getenv("SAMPLY_DOWNLOADS_DIR", str(Path(__file__).parent / "samply_downloads"))))
 
 
 def load_state():
@@ -25,48 +32,17 @@ def save_state(state):
         json.dump(state, f, indent=2)
 
 
-def get_cdn_url(state, file_id):
-    """Build CDN URL for a file."""
-    return f"{state['cdn_base']}/{file_id}/output/aac256k@output.mp4"
-
-
-def download_track(state, track):
-    """Download a single track from CDN."""
-    url = get_cdn_url(state, track["file_id"])
-    mp4_path = DOWNLOADS_DIR / f"{track['file_id']}.mp4"
-    mp3_path = DOWNLOADS_DIR / track["name"]
-    
-    # Download MP4
-    print(f"Downloading {track['name']}...")
-    subprocess.run([
-        "curl", "-L", "-o", str(mp4_path), url
-    ], check=True, capture_output=True)
-    
-    # Convert to MP3
-    print(f"Converting to MP3...")
-    subprocess.run([
-        "ffmpeg", "-y", "-i", str(mp4_path),
-        "-c:a", "libmp3lame", "-q:a", "2",
-        str(mp3_path)
-    ], check=True, capture_output=True)
-    
-    # Cleanup MP4
-    mp4_path.unlink()
-    print(f"✓ {track['name']} downloaded")
-    
-    return True
-
-
 def main():
     state = load_state()
-    print(f"Samply Tracker - {state['project_name']}")
-    print(f"Artist: {state['artist']}")
-    print(f"URL: {state['url']}")
+    
+    print(f"Samply Tracker - {state.get('project_name', os.getenv('SAMPLY_PROJECT_NAME', 'Unknown'))}")
+    print(f"Artist: {state.get('artist', os.getenv('SAMPLY_ARTIST', 'Unknown'))}")
+    print(f"URL: {state.get('url', os.getenv('SAMPLY_URL', 'N/A'))}")
     print()
     print("Tracks:")
-    for track in state["tracks"]:
+    for track in state.get("tracks", []):
         status = "✓ downloaded" if track.get("downloaded") else "○ pending"
-        print(f"  [{status}] {track['name']} (v{track['version']}) - {track['duration']}")
+        print(f"  [{status}] {track['name']} (v{track['version']}) - {track.get('duration', '?')}")
     print()
     print(f"Last check: {state.get('last_check', 'never')}")
     print(f"Downloads: {DOWNLOADS_DIR}")

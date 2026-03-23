@@ -8,6 +8,9 @@ A Python toolkit for tracking and downloading audio files from Samply project sh
 - [Dependencies](#dependencies)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
+  - [Check for Updates](#check-for-updates)
+  - [Display Status](#display-status)
+  - [Browser Checker (Standalone)](#browser-checker-standalone)
 - [Configuration](#configuration)
 - [How It Works](#how-it-works)
 - [Code Architecture](#code-architecture)
@@ -25,6 +28,7 @@ A Python toolkit for tracking and downloading audio files from Samply project sh
 - Python 3.8 or higher
 - `ffmpeg` installed and available in your PATH
 - `curl` installed and available in your PATH
+- Chromium browser (system install or Playwright-managed)
 
 ### Install Python Dependencies
 
@@ -33,12 +37,22 @@ pip install python-dotenv playwright
 playwright install chromium
 ```
 
+Or use your system Chromium (auto-detected):
+
+```bash
+# Arch Linux
+sudo pacman -S chromium
+
+# Debian/Ubuntu
+sudo apt install chromium
+```
+
 ### Clone and Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/SamplyScraperDownloader.git
-cd SamplyScraperDownloader
+git clone https://github.com/icefields/Samply-Scraper-Downloader.git
+cd Samply-Scraper-Downloader
 
 # Create your configuration
 cp .env-example .env
@@ -60,6 +74,7 @@ mkdir -p ~/Music/samply_downloads
 |------|---------|--------------|
 | `ffmpeg` | Audio conversion and encoding | `sudo apt install ffmpeg` (Debian/Ubuntu) or `brew install ffmpeg` (macOS) |
 | `curl` | Downloading files from CDN | Usually pre-installed on most systems |
+| `chromium` | Browser automation (headless) | System package or `playwright install chromium` |
 
 ### Python Packages
 
@@ -67,31 +82,6 @@ mkdir -p ~/Music/samply_downloads
 |---------|---------|---------|
 | `python-dotenv` | Load environment variables from .env files | >=0.19.0 |
 | `playwright` | Browser automation for version checking | >=1.40.0 |
-
-### Installing Playwright
-
-After installing the Python package, you must install the browser:
-
-```bash
-pip install playwright
-playwright install chromium
-```
-
-Or use your system's Chromium (the script will auto-detect `/usr/bin/chromium`):
-
-```bash
-# Arch Linux
-sudo pacman -S chromium
-
-# Debian/Ubuntu
-sudo apt install chromium
-```
-# Arch Linux
-sudo pacman -S chromium
-
-# Debian/Ubuntu
-sudo apt install chromium
-```
 
 ---
 
@@ -106,7 +96,7 @@ sudo apt install chromium
 
 2. **Initialize the state file**
 
-   You'll need to create `samply_tracker_state.json` with your project info:
+   Create `samply_tracker_state.json` with your project info:
 
    ```json
    {
@@ -128,6 +118,8 @@ sudo apt install chromium
    }
    ```
 
+   To find `user_id` and `file_id`, open your browser's DevTools (F12), go to the Network tab, and reload the Samply page. Look for API requests containing these IDs.
+
 3. **Run the tracker**
 
    ```bash
@@ -138,47 +130,103 @@ sudo apt install chromium
 
 ## Usage
 
-### Display Project Status
+### Check for Updates
+
+The main script that checks for new versions and downloads updates:
+
+```bash
+# Check for updates using the URL from state file
+python3 samply_check.py
+
+# Output when no updates:
+# No updates found
+
+# Output when updates found:
+# Found 1 updated track(s):
+#   Sweet Fiend EP.mp3: v7 → v8
+#   Downloaded FLAC source
+#   ✓ Converted to Sweet Fiend EP.opus
+#   ✓ Downloaded Sweet Fiend EP.mp3
+#
+# Updates complete!
+```
+
+**What it does:**
+1. Loads state from `samply_tracker_state.json`
+2. Calls `samply_browser.py` to extract current versions from the Samply page
+3. Compares with stored versions
+4. Downloads any updated tracks from CDN
+5. Converts to your configured output format (Opus/MP3/FLAC)
+6. Updates the state file with new versions and history
+
+### Display Status
+
+Show the current status of tracked projects:
 
 ```bash
 python3 samply_tracker.py
+
+# Output:
+# Samply Tracker - Sweet Fiend 2025
+# Artist: Keegan Okazaki
+# URL: https://samply.app/p/vK1BBYfLHbbSLee53OYW
+#
+# Tracks:
+#   [✓ downloaded] Sweet Fiend EP.mp3 (v8) - 23:29
+#
+# Last check: 2026-03-23T16:20:18.101525
+# Downloads: /home/user/Music/samply_downloads
 ```
 
-Output:
-```
-Samply Tracker - Project Name
-Artist: Artist Name
-URL: https://samply.app/p/SHARE_ID
+This is a read-only operation — it doesn't check for updates or download anything.
 
-Tracks:
-  [✓ downloaded] Track One.mp3 (v5) - 4:32
-  [○ pending] Track Two.mp3 (v3) - 3:21
+### Browser Checker (Standalone)
 
-Last check: 2026-03-23T14:49:00-04:00
-Downloads: /home/user/Music/samply_downloads
-```
-
-### Check for Updates
+You can run the browser checker independently to see what versions are currently on Samply:
 
 ```bash
-python3 samply_check.py
+# Check using URL from state file
+python3 samply_browser.py --state samply_tracker_state.json
+
+# Output:
+# {"Sweet Fiend EP.mp3": 8}
+
+# Check using direct URL
+python3 samply_browser.py "https://samply.app/p/vK1BBYfLHbbSLee53OYW"
+
+# Output:
+# {"Sweet Fiend EP.mp3": 8}
+
+# With custom timeout (default 60000ms)
+python3 samply_browser.py --state samply_tracker_state.json --timeout 120000
+
+# Output:
+# {"Sweet Fiend EP.mp3": 8}
 ```
 
-This script:
-1. Connects to the Samply page via browser automation
-2. Extracts current track versions
-3. Downloads any updated tracks
-4. Converts to your preferred output format
-5. Updates the state file
+**What it does:**
+1. Opens the Samply URL in headless Chromium
+2. Waits 10 seconds for React to render the page
+3. Extracts track names and version numbers from the DOM
+4. Returns JSON to stdout
+
+**Exit codes:**
+- `0` — Success (JSON output)
+- `1` — Error (JSON with `error` key)
 
 ### Manual Download
 
-If you want to manually download a specific track, you can use the CDN URL pattern:
+If you want to manually download a specific track:
 
 ```bash
-# Replace USER_ID and FILE_ID with actual values
+# Download from CDN (AAC 256kbps)
 curl -L -o "track.mp4" "https://cdn.samply.app/users/USER_ID/files/FILE_ID/output/aac256k@output.mp4"
-ffmpeg -i track.mp4 -c:a libmp3lame -q:a 2 track.mp3
+
+# Or download FLAC (if available)
+curl -L -o "track.mp4" "https://cdn.samply.app/users/USER_ID/files/FILE_ID/output/flac@output.mp4"
+
+# Convert to your preferred format
+ffmpeg -i track.mp4 -c:a libopus -b:a 192k track.opus
 ```
 
 ---
@@ -200,7 +248,7 @@ Configuration is handled via environment variables, loaded from two files in ord
 | `SAMPLY_DOWNLOADS_DIR` | No | `./samply_downloads` | Directory for downloaded files |
 | `SAMPLY_STATE_FILE` | No | `./samply_tracker_state.json` | Path to state file |
 | `SAMPLY_PREFER_FLAC` | No | `true` | Download FLAC source when available |
-| `SAMPLY_OUTPUT_FORMAT` | No | `opus` | Output audio format |
+| `SAMPLY_OUTPUT_FORMAT` | No | `opus` | Output audio format (`opus`, `mp3`, `flac`) |
 | `SAMPLY_OUTPUT_BITRATE` | No | `192k` | Bitrate for lossy formats |
 | `SAMPLY_MATRIX_ROOM` | No | `""` | Matrix room for notifications (optional) |
 
@@ -237,6 +285,70 @@ This tool:
 3. **Converts formats** — Converts from Samply's source format to your preferred output
 4. **Maintains history** — Keeps a record of all version changes
 
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         samply_check.py                                 │
+│                       (Main Entry Point)                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. Load state from samply_tracker_state.json                          │
+│                          │                                              │
+│                          ▼                                              │
+│  2. Call samply_browser.py ─────────────────────────────────────────┐  │
+│                          │                                          │  │
+│                          ▼                                          │  │
+│  ┌───────────────────────────────────────────────────────────────┐   │  │
+│  │                    samply_browser.py                           │   │  │
+│  │                  (Browser Automation)                          │   │  │
+│  ├───────────────────────────────────────────────────────────────┤   │  │
+│  │  • Launch headless Chromium                                    │   │  │
+│  │  • Navigate to Samply URL                                      │   │  │
+│  │  • Wait 10 seconds for React render                            │   │  │
+│  │  • Extract track names + versions from DOM                     │   │  │
+│  │  • Return JSON: {"Track.mp3": 8}                               │   │  │
+│  └───────────────────────────────────────────────────────────────┘   │  │
+│                          │                                              │  │
+│                          ▼                                              │
+│  3. Compare versions with stored state                                 │
+│                          │                                              │
+│               ┌──────────┴──────────┐                                  │
+│               ▼                     ▼                                  │
+│          No changes            New version found                        │
+│               │                     │                                   │
+│               ▼                     ▼                                   │
+│     Update timestamp        Download from CDN                          │
+│     Save state                    │                                    │
+│                                   ▼                                    │
+│                          Convert to Opus/MP3/FLAC                       │
+│                                   │                                    │
+│                                   ▼                                    │
+│                          Update state file                              │
+│                                   │                                    │
+│                                   ▼                                    │
+│                          Append to history                               │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### samply_browser.py
+
+The browser automation component uses **Playwright** to:
+
+1. Launch a headless Chromium browser
+2. Navigate to the Samply share URL
+3. Wait for React to render (10 seconds)
+4. Extract track info from DOM elements
+5. Return JSON to stdout
+
+**Why Playwright?**
+
+- Headless mode works on servers without GUI
+- Automatically handles JavaScript rendering
+- Supports multiple browser engines (Chromium, Firefox, WebKit)
+- More reliable than Selenium for single-page apps
+
 ### Samply CDN Architecture
 
 Samply stores audio files on a CDN with the following URL pattern:
@@ -252,51 +364,6 @@ Where:
 
 The `aac256k` quality is always available. FLAC availability depends on whether the uploader provided a lossless source.
 
-### Version Tracking
-
-Samply displays version numbers for each track in the web UI. The browser automation component:
-
-1. Opens the Samply share URL
-2. Waits for the page to load
-3. Extracts version numbers from the DOM
-4. Returns a dict of `{track_name: version}`
-
-The checker compares these versions against the stored state and identifies which tracks have been updated.
-
-### Download Flow
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      samply_check.py                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  1. Load state from SAMPLY_STATE_FILE                       │
-│                    │                                        │
-│                    ▼                                        │
-│  2. Check current versions via browser                      │
-│                    │                                        │
-│                    ▼                                        │
-│  3. Compare with stored versions                            │
-│                    │                                        │
-│          ┌────────┴────────┐                               │
-│          ▼                 ▼                               │
-│     No changes         New version                          │
-│          │                 │                               │
-│          ▼                 ▼                               │
-│     Update timestamp   Download from CDN                    │
-│                              │                              │
-│                              ▼                              │
-│                        Convert format                        │
-│                              │                              │
-│                              ▼                              │
-│                        Update state file                     │
-│                              │                              │
-│                              ▼                              │
-│                        Append to history                     │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
 ---
 
 ## Code Architecture
@@ -310,8 +377,9 @@ SamplyScraperDownloader/
 ├── .env.samply             # Default configuration
 ├── .git/                   # Git repository
 ├── README.md               # This file
-├── samply_check.py         # Main checker script
-├── samply_tracker.py       # Status display script
+├── samply_browser.py       # Browser automation (Playwright)
+├── samply_check.py         # Main checker + downloader
+├── samply_tracker.py       # Status display (read-only)
 ├── samply_tracker_state.json  # State file
 └── samply_downloads/       # Downloaded audio files
     ├── track1.opus
@@ -319,326 +387,57 @@ SamplyScraperDownloader/
     └── ...
 ```
 
+### Script Reference
+
+| Script | Purpose | Dependencies |
+|--------|---------|--------------|
+| `samply_tracker.py` | Display project status | python-dotenv |
+| `samply_check.py` | Check for updates + download | python-dotenv, ffmpeg, curl |
+| `samply_browser.py` | Extract versions from page | playwright, chromium |
+
 ### samply_tracker.py
 
-The `samply_tracker.py` script is a read-only utility that displays the current status of tracked projects.
-
-#### Module Imports
-
-```python
-import json
-import os
-from datetime import datetime
-from pathlib import Path
-from dotenv import load_dotenv
-```
-
-| Module | Purpose |
-|--------|---------|
-| `json` | Parse and write state file |
-| `os` | Environment variable access |
-| `datetime` | Timestamp handling |
-| `pathlib.Path` | Cross-platform path operations |
-| `dotenv.load_dotenv` | Load .env configuration files |
-
-#### Configuration Loading
-
-The script loads configuration in a two-pass approach:
-
-```python
-env_path = Path(__file__).parent
-load_dotenv(env_path / ".env", override=True)      # User config first
-load_dotenv(env_path / ".env.samply")               # Defaults as fallback
-```
-
-This ensures user settings in `.env` take precedence over defaults in `.env.samply`.
-
-#### Path Expansion
-
-```python
-STATE_FILE = Path(os.path.expanduser(os.getenv("SAMPLY_STATE_FILE", ...)))
-DOWNLOADS_DIR = Path(os.path.expanduser(os.getenv("SAMPLY_DOWNLOADS_DIR", ...)))
-```
-
-The `os.path.expanduser()` call converts `~` to the home directory path, allowing users to write:
-
-```bash
-SAMPLY_DOWNLOADS_DIR=~/Music/samply_downloads
-```
-
-Instead of:
-
-```bash
-SAMPLY_DOWNLOADS_DIR=/home/username/Music/samply_downloads
-```
-
-#### State Management
-
-```python
-def load_state():
-    with open(STATE_FILE) as f:
-        return json.load(f)
-
-def save_state(state):
-    state["last_check"] = datetime.now().isoformat()
-    with open(STATE_FILE, 'w') as f:
-        json.dump(state, f, indent=2)
-```
-
-State is stored as JSON with human-readable formatting (`indent=2`). The `last_check` timestamp is updated on every save.
-
-#### Main Function
+Read-only utility that displays project information:
 
 ```python
 def main():
     state = load_state()
-    
-    # Display project info from state or environment
-    print(f"Samply Tracker - {state.get('project_name', os.getenv('SAMPLY_PROJECT_NAME', 'Unknown'))}")
-    print(f"Artist: {state.get('artist', os.getenv('SAMPLY_ARTIST', 'Unknown'))}")
-    print(f"URL: {state.get('url', os.getenv('SAMPLY_URL', 'N/A'))}")
-    
-    # List tracks with status
+    print(f"Samply Tracker - {state.get('project_name', 'Unknown')}")
+    print(f"Artist: {state.get('artist', 'Unknown')}")
     for track in state.get("tracks", []):
         status = "✓ downloaded" if track.get("downloaded") else "○ pending"
-        print(f"  [{status}] {track['name']} (v{track['version']}) - {track.get('duration', '?')}")
-    
-    # Show last check and downloads path
-    print(f"Last check: {state.get('last_check', 'never')}")
-    print(f"Downloads: {DOWNLOADS_DIR}")
+        print(f"  [{status}] {track['name']} (v{track['version']})")
 ```
-
-The display prioritizes state file values over environment variables, allowing per-project overrides.
-
----
 
 ### samply_check.py
 
-The `samply_check.py` script performs the actual update checking and downloading.
+Main checker that orchestrates the update process:
 
-#### Additional Configuration
+1. Calls `samply_browser.py` via subprocess
+2. Parses JSON output
+3. Compares versions
+4. Downloads updated tracks
+5. Converts to output format
+6. Updates state file
 
-```python
-PREFER_FLAC = os.getenv("SAMPLY_PREFER_FLAC", "true").lower() == "true"
-OUTPUT_FORMAT = os.getenv("SAMPLY_OUTPUT_FORMAT", "opus")
-OUTPUT_BITRATE = os.getenv("SAMPLY_OUTPUT_BITRATE", "192k")
-```
+### samply_browser.py
 
-These variables control audio quality preferences:
-- `PREFER_FLAC`: Whether to attempt FLAC download first
-- `OUTPUT_FORMAT`: Target format (`opus`, `mp3`, or `flac`)
-- `OUTPUT_BITRATE`: Quality setting for lossy formats
-
-#### CDN URL Construction
+Browser automation using Playwright:
 
 ```python
-def get_cdn_url(state, file_id, quality="aac256k"):
-    """Build CDN URL for a file.
-    
-    quality: 'aac256k', 'flac', or 'wav'
-    """
-    return f"{state['cdn_base']}/{file_id}/output/{quality}@output.mp4"
-```
-
-The `cdn_base` is derived from the user ID and stored in the state file:
-
-```
-https://cdn.samply.app/users/{USER_ID}/files/{FILE_ID}/output/{QUALITY}@output.mp4
-```
-
-#### Download Function
-
-The `download_track()` function handles the complete download and conversion pipeline:
-
-```python
-def download_track(state, track, prefer_flac=None):
-    """Download and convert a track.
-    
-    If prefer_flac=True and FLAC is available, downloads FLAC version.
-    Otherwise downloads AAC 256kbps version.
-    Converts to configured output format (default: Opus 192kbps).
-    """
-```
-
-##### Step 1: Determine FLAC Preference
-
-```python
-if prefer_flac is None:
-    prefer_flac = PREFER_FLAC
-```
-
-Allows overriding the global setting per-call.
-
-##### Step 2: Try FLAC Download
-
-```python
-if prefer_flac:
-    flac_url = f"{base_url}/flac@output.mp4"
-    flac_path = DOWNLOADS_DIR / f"{track['file_id']}_flac.mp4"
-    result = subprocess.run(
-        ["curl", "-L", "-f", "-o", str(flac_path), flac_url],
-        capture_output=True
-    )
-    if result.returncode == 0:
-        source_path = flac_path
-        print(f"  Downloaded FLAC source")
-```
-
-The `-f` flag makes curl fail silently on HTTP errors, allowing graceful fallback to AAC.
-
-##### Step 3: Fallback to AAC
-
-```python
-if not source_path:
-    aac_url = f"{base_url}/aac256k@output.mp4"
-    aac_path = DOWNLOADS_DIR / f"{track['file_id']}_aac.mp4"
-    subprocess.run(["curl", "-L", "-o", str(aac_path), aac_url], check=True, capture_output=True)
-    source_path = aac_path
-    print(f"  Downloaded AAC source")
-```
-
-AAC 256kbps is always available as a fallback.
-
-##### Step 4: Convert to Output Format
-
-The function supports three output formats with appropriate ffmpeg parameters:
-
-**Opus (default):**
-```python
-ffmpeg_cmd = [
-    "ffmpeg", "-y", "-i", str(source_path),
-    "-vn", "-c:a", "libopus",
-    "-application", "audio",
-    "-b:a", OUTPUT_BITRATE,
-    "-compression_level", "10",
-    "-vbr", "on",
-    "-f", "ogg",
-    str(output_path)
-]
-```
-
-- `-vn`: No video (strip any video stream)
-- `-c:a libopus`: Use Opus codec
-- `-application audio`: Optimize for music
-- `-compression_level 10`: Maximum compression (slower encoding)
-- `-vbr on`: Variable bitrate for better quality/size ratio
-
-**MP3:**
-```python
-ffmpeg_cmd = [
-    "ffmpeg", "-y", "-i", str(source_path),
-    "-vn", "-c:a", "libmp3lame",
-    "-q:a", q_val,  # VBR quality (0=best, 9=worst)
-    str(output_path)
-]
-```
-
-Quality mapping:
-| Bitrate | MP3 Quality (`-q:a`) |
-|---------|---------------------|
-| 128k | 4 |
-| 192k | 2 |
-| 256k | 1 |
-| 320k | 0 |
-
-**FLAC:**
-```python
-ffmpeg_cmd = [
-    "ffmpeg", "-y", "-i", str(source_path),
-    "-vn", "-c:a", "flac",
-    "-compression_level", "8",
-    str(output_path)
-]
-```
-
-FLAC is lossless, so bitrate doesn't apply. Compression level 8 is maximum.
-
-##### Step 5: Cleanup
-
-```python
-source_path.unlink(missing_ok=True)
-print(f"  ✓ Converted to {output_path.name}")
-```
-
-Remove the temporary MP4 download file after successful conversion.
-
-#### Browser Check Function
-
-```python
-def check_via_browser(state):
-    """
-    Check current versions via browser automation.
-    Returns dict of track_name -> version, or None if check failed.
-    """
-    # Placeholder - actual implementation uses OpenClaw browser automation
-    pass
-```
-
-This is a placeholder for the browser automation component. When run as an OpenClaw cron job, the agent:
-
-1. Opens the Samply URL in a browser
-2. Takes a snapshot of the page
-3. Extracts version numbers from track elements
-4. Returns the current versions
-
-The function signature returns `dict[str, int]` where keys are track names and values are version numbers.
-
-#### Version Comparison
-
-```python
-def compare_versions(old_tracks, current_versions):
-    """Find tracks that have been updated."""
-    changes = []
-    for track in old_tracks:
-        name = track["name"]
-        if name in current_versions:
-            if current_versions[name] > track["version"]:
-                changes.append({
-                    "track": track,
-                    "old_version": track["version"],
-                    "new_version": current_versions[name]
-                })
-    return changes
-```
-
-Returns a list of changed tracks with old and new versions.
-
-#### Main Check Loop
-
-```python
-def main():
-    # Ensure downloads directory exists
-    DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    
-    state = load_state()
-    current_versions = check_via_browser(state)
-    
-    if current_versions is None:
-        print("Could not check versions - browser tab may not be attached")
-        sys.exit(1)
-    
-    changes = compare_versions(state["tracks"], current_versions)
-    
-    if changes:
-        for change in changes:
-            # Update version in state
-            for track in state["tracks"]:
-                if track["name"] == change["track"]["name"]:
-                    track["version"] = change["new_version"]
-                    download_track(state, track)
-                    track["downloaded"] = True
+def extract_versions(url: str, timeout: int = 60000) -> dict:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(url, timeout=timeout, wait_until="load")
+        time.sleep(10)  # Wait for React
         
-        # Add to history
-        for change in changes:
-            state["history"].append({
-                "date": datetime.now().strftime("%Y-%m-%d"),
-                "change": f"{change['track']['name']} updated v{change['old_version']}→v{change['new_version']}"
-            })
+        track_items = page.query_selector_all("listitem")
+        # ... extract track names and versions
         
-        save_state(state)
+        browser.close()
+        return versions
 ```
-
-The history feature maintains a log of all version changes for reference.
 
 ---
 
@@ -663,7 +462,7 @@ The state file (`samply_tracker_state.json`) stores all project information:
       "downloaded": true
     }
   ],
-  "last_check": "2026-03-23T14:49:00-04:00",
+  "last_check": "2026-03-23T16:20:18.101525",
   "last_check_status": "v5 (no change)",
   "history": [
     {
@@ -694,29 +493,6 @@ The state file (`samply_tracker_state.json`) stores all project information:
 | `last_check_status` | string | Human-readable status message |
 | `history` | array | Log of version changes |
 
-### Initial Setup
-
-To track a new project, you need to:
-
-1. **Find the share URL** — Open the Samply link in your browser
-2. **Extract user_id** — Open browser dev tools, Network tab, reload page, find API requests
-3. **Get track file_ids** — Same network requests will show track UUIDs
-4. **Create the state file** with this information
-
-Example network request showing file IDs:
-
-```
-GET /api/projects/{PROJECT_ID}/tracks
-Response: [
-  {
-    "id": "56601b22-6019-448e-a348-12959e68f436",
-    "name": "My Track",
-    "version": 5,
-    "duration": "3:45"
-  }
-]
-```
-
 ---
 
 ## Output Formats
@@ -728,7 +504,7 @@ Best quality-to-size ratio. Great for streaming and mobile devices.
 - **Quality:** 192kbps VBR (configurable)
 - **File size:** ~5MB per hour of audio
 - **Compatibility:** All modern browsers, Android, Linux
-- **Extension:** `.opus` (actually Ogg container)
+- **Extension:** `.opus` (Ogg container)
 
 ```bash
 SAMPLY_OUTPUT_FORMAT=opus
@@ -766,20 +542,25 @@ SAMPLY_OUTPUT_FORMAT=flac
 
 ## Troubleshooting
 
-### "Could not check versions - browser tab may not be attached"
+### "playwright not installed"
 
-The browser automation component requires an attached browser. This error means:
+```bash
+pip install playwright
+playwright install chromium
+```
 
-1. Running standalone without OpenClaw browser automation
-2. Browser session expired or was closed
+### "Timeout loading page after 60000ms"
 
-**Solution:** Run within OpenClaw cron job context, or implement your own browser automation.
+The Samply page is slow to load. Increase the timeout:
+
+```bash
+python3 samply_browser.py --state samply_tracker_state.json --timeout 120000
+```
+
+Or edit `samply_browser.py` and increase the `sleep(10)` wait time.
 
 ### "ffmpeg: command not found"
 
-FFmpeg is required for audio conversion.
-
-**Solution:**
 ```bash
 # Debian/Ubuntu
 sudo apt install ffmpeg
@@ -793,9 +574,6 @@ sudo pacman -S ffmpeg
 
 ### "Permission denied" when creating downloads directory
 
-The script doesn't have permission to create the output directory.
-
-**Solution:**
 ```bash
 # Create directory manually with correct permissions
 mkdir -p ~/Music/samply_downloads
@@ -811,17 +589,22 @@ The CDN may have expired the file or rate-limited requests.
 **Solutions:**
 1. Wait a few minutes and retry
 2. Check if the Samply share link is still valid
-3. Verify the file_id matches current track versions
+3. Verify the `file_id` matches current track versions
 
 ### FLAC download fails but AAC works
 
-The uploader didn't provide a lossless source.
+The uploader didn't provide a lossless source. This is normal — the script will automatically fall back to AAC.
 
-**Solution:** This is normal. The script will automatically fall back to AAC.
+### Empty JSON output from browser checker
+
+The page might not have loaded in time. Try:
+
+```bash
+# Increase timeout and check with debug output
+python3 samply_browser.py --state samply_tracker_state.json --timeout 120000 --debug
+```
 
 ### State file corruption
-
-If the state file becomes corrupted:
 
 ```bash
 # Backup corrupted file
@@ -839,15 +622,16 @@ mv samply_tracker_state.json samply_tracker_state.json.bak
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/SamplyScraperDownloader.git
-cd SamplyScraperDownloader
+git clone https://github.com/icefields/Samply-Scraper-Downloader.git
+cd Samply-Scraper-Downloader
 
 # Create virtual environment
 python -m venv venv
 source venv/bin/activate
 
 # Install dependencies
-pip install python-dotenv
+pip install python-dotenv playwright
+playwright install chromium
 
 # Run tests (if available)
 python -m pytest
@@ -877,6 +661,14 @@ MIT License — See LICENSE file for details.
 ---
 
 ## Changelog
+
+### Version 1.1.0 (2026-03-23)
+
+- Added `samply_browser.py` with Playwright automation
+- Implemented `check_via_browser()` functionality
+- Browser uses system Chromium if available
+- 10-second wait for React rendering
+- Proper error handling and JSON output
 
 ### Version 1.0.0 (2026-03-23)
 

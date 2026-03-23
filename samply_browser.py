@@ -60,7 +60,7 @@ def extract_versions(url: str, timeout: int = 60000) -> dict:
             page.goto(url, timeout=timeout, wait_until="load")
             
             # Wait for React to render tracks
-            time.sleep(5)
+            time.sleep(10)
             
             # Find track elements - try multiple selectors
             track_items = page.query_selector_all("listitem")

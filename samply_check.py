@@ -137,15 +137,40 @@ def check_via_browser(state):
     Check current versions via browser automation.
     Returns dict of track_name -> version, or None if check failed.
     
-    Note: This requires the browser tab to be attached.
-    The cron job should spawn an isolated session that:
-    1. Opens the Samply page
-    2. Extracts track versions from the snapshot
-    3. Returns the results
+    Calls samply_browser.py which uses Playwright to extract versions.
     """
-    # This is a placeholder - actual browser check would be done
-    # by spawning a sub-agent with browser access
-    pass
+    import subprocess
+    
+    url = state.get("url")
+    if not url:
+        print("No URL in state file")
+        return None
+    
+    # Run the browser checker
+    script_dir = Path(__file__).parent
+    browser_script = script_dir / "samply_browser.py"
+    
+    result = subprocess.run(
+        ["python3", str(browser_script), "--state", str(STATE_FILE)],
+        capture_output=True,
+        text=True
+    )
+    
+    if result.returncode != 0:
+        print(f"Browser check failed: {result.stderr}")
+        return None
+    
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse browser output: {e}")
+        return None
+    
+    if "error" in data:
+        print(f"Browser error: {data['error']}")
+        return None
+    
+    return data
 
 
 def compare_versions(old_tracks, current_versions):

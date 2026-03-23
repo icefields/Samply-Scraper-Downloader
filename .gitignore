@@ -1,0 +1,19 @@
+# Environment files - may contain personal info
+.env
+.env.samply
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+
+# Downloads
+samply_downloads/
+
+# State file - contains personal URLs and IDs
+samply_tracker_state.json
